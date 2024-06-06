@@ -1,7 +1,7 @@
 // gpt api 사용하기
 
 import 'package:flutter/material.dart';
-import 'api_service.dart';
+import 'practice1-2.dart';
 
 void main() {
   runApp(MyApp());
