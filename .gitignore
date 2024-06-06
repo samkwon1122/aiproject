@@ -43,3 +43,6 @@ app.*.map.json
 /android/app/release
 
 /lib/gpt_api.dart
+/lib/practice1-1.dart
+/lib/practice1-2.dart
+/lib/practice2.dart

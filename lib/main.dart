@@ -30,10 +30,10 @@ class VoiceToTextScreen extends StatefulWidget {
 }
 
 class _VoiceToTextScreenState extends State<VoiceToTextScreen> {
-  List<String> _summaries = [];
+  List<String> _summaries = []; // 추가된 일정 요약
   DeviceCalendarPlugin _deviceCalendarPlugin = DeviceCalendarPlugin();
-  Calendar? _defaultCalendar;
-  Calendar? _undecidedCalendar;
+  Calendar? _defaultCalendar; // 확정된 일정 추가하는 캘린더
+  Calendar? _undecidedCalendar; // 미확정 일정 추가하는 캘린더
 
   @override
   void initState() {
@@ -53,6 +53,7 @@ class _VoiceToTextScreenState extends State<VoiceToTextScreen> {
       }
     }
 
+    // 캘린더 있는지 확인하고 없으면 새로 생성
     final calendarsResult = await _deviceCalendarPlugin.retrieveCalendars();
     if (calendarsResult.isSuccess && calendarsResult.data!.isNotEmpty) {
       var planACalendar = calendarsResult.data!.firstWhere(
@@ -108,7 +109,7 @@ class _VoiceToTextScreenState extends State<VoiceToTextScreen> {
   }
 
   Future<void> _pickFileAndTranscribe() async {
-    // 파일 선택
+    // 통화 녹음 경로
     Directory recordDir = await Directory('/storage/emulated/0/Call');
     List<FileSystemEntity> files = recordDir.listSync();
 
@@ -119,6 +120,8 @@ class _VoiceToTextScreenState extends State<VoiceToTextScreen> {
     for (var file in files) {
       if (file is File) {
         DateTime modificationDate = file.lastModifiedSync();
+
+        // 오늘자 음성 파일 선택
         if (modificationDate.isAfter(startOfToday) && modificationDate.isBefore(endOfToday)) {
           String selectedFile = file.path;
 
@@ -128,9 +131,17 @@ class _VoiceToTextScreenState extends State<VoiceToTextScreen> {
 
           // OpenAI Whisper API 호출
           String transcription = await _transcribeFile(selectedFile);
+          if (transcription == "") {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("파일 변환에 실패했습니다.")));
+            continue;
+          }
 
           // GPT API 호출하여 일정 정보 추출
           String schedules = await _extractSchedules(transcription);
+          if (schedules == "") {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("일정 추출에 실패했습니다.")));
+            continue;
+          }
 
           // 캘린더에 일정 추가
           List<dynamic> schedulesList = json.decode(schedules);
@@ -142,6 +153,7 @@ class _VoiceToTextScreenState extends State<VoiceToTextScreen> {
     }
   }
 
+  // OpenAI Whisper API 호출
   Future<String> _transcribeFile(String filePath) async {
     String apiKey = gptApi;
     var request = http.MultipartRequest('POST', Uri.parse('https://api.openai.com/v1/audio/transcriptions'));
@@ -158,10 +170,11 @@ class _VoiceToTextScreenState extends State<VoiceToTextScreen> {
     } else {
       //print('Failed to transcribe file: ${responseBody.statusCode}');
       //print('Response body: ${responseBody.body}');
-      return '파일 변환에 실패하였습니다.';
+      return "";
     }
   }
 
+  // GPT API 호출하여 일정 정보 추출
   Future<String> _extractSchedules(String text) async {
     String apiKey = gptApi;
     final now = tz.TZDateTime.now(tz.local);
@@ -242,11 +255,11 @@ class _VoiceToTextScreenState extends State<VoiceToTextScreen> {
     } else {
       //print('Failed to extract schedules: ${responseBody.statusCode}');
       //print('Response body: ${responseBody.body}');
-      return '일정 추출에 실패하였습니다.';
+      return "";
     }
   }
 
-
+  // 캘린더에 일정 추가
   Future<void> _addScheduleToCalendar(Map<String, dynamic> schedule) async {
     if (_defaultCalendar == null || _undecidedCalendar == null) {
       return;
@@ -263,7 +276,7 @@ class _VoiceToTextScreenState extends State<VoiceToTextScreen> {
 
     final TZDateTime endDateTime = startDateTime.add(Duration(hours: 1));
 
-    if (schedule['decided'] == "1") {
+    if (schedule['decided'] == "1") { // 확정된 일정인 경우
       event = Event(
         _defaultCalendar!.id,
         title: schedule['task'],
@@ -278,7 +291,7 @@ class _VoiceToTextScreenState extends State<VoiceToTextScreen> {
         _summaries.add("일정: ${schedule['task']}\n시간: ${schedule['date']} ${schedule['time']}\n참여자: ${schedule['participants']}");
       });
     } else {
-      event = Event(
+      event = Event( // 미확정 일정인 경우
         _undecidedCalendar!.id,
         title: schedule['task'] + " (미확정)",
         description: schedule['participants'],
@@ -292,8 +305,6 @@ class _VoiceToTextScreenState extends State<VoiceToTextScreen> {
         _summaries.add("일정: ${schedule['task']} (미확정)\n시간: ${schedule['date']} ${schedule['time']}\n참여자: ${schedule['participants']}");
       });
     }
-
-
 
     final result = await _deviceCalendarPlugin.createOrUpdateEvent(event);
     if (result?.isSuccess != true) {
