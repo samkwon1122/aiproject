@@ -1,6 +1,6 @@
 # Plan-A
 
-![logo](./assets/logo.png)
+<p align="center"><img src="./assets/logo.png" height="256px" width="256px"></p>
 
 AI 핵심기술 기반 실무 프로젝트 1 수업   
 
